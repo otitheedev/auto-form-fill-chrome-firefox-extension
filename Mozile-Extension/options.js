@@ -17,7 +17,12 @@ function showToast(msg) {
 
 function updateCustomFilesStatus(cf) {
   const el = document.getElementById('customFilesStatus');
-  if (el) el.textContent = cf && (cf.image || cf.pdf || cf.doc) ? 'Custom files set' : '';
+  if (!el) return;
+  const parts = [];
+  if (cf?.image) parts.push('image');
+  if (cf?.pdf) parts.push('pdf');
+  if (cf?.doc) parts.push('doc');
+  el.textContent = parts.length ? 'Set: ' + parts.join(', ') : '';
 }
 
 const PHONE_FORMAT_KEY = 'phoneFormat';
@@ -92,20 +97,14 @@ function renderRules(rules) {
   const list = document.getElementById('rulesList');
   if (!list) return;
   if (rules.length === 0) {
-    list.innerHTML = `
-      <div class="rules-empty">
-        <div class="illus" aria-hidden="true">📝</div>
-        <p>No custom rules yet</p>
-        <p class="hint">Add patterns below. Complete values (like +8801878578504) fill EXACT value. Text (like "phone") fills random data.</p>
-        <p class="hint" style="margin-top:10px;text-align:left"><strong>Fixed value</strong>: <code>+8801878578504</code> [fixed] → Phone = fills that exact number. <strong>Text</strong>: <code>nickname</code> → Name (any field containing "nickname").<br><strong>Regex</strong>: <code>my_.*field</code> → Email (pattern match).<br><strong>Skip</strong>: <code>internal_id</code> → Skip (don't fill).</p>
-      </div>`;
+    list.innerHTML = '<div class="rules-empty">No rules yet. Add a pattern below.</div>';
     return;
   }
   list.innerHTML = rules.map((rule, i) =>
     `<div class="rule-item" data-i="${i}">
       <span class="pattern">${escapeHtml(rule.pattern)}</span>
-      <span class="fillType">${rule.regex ? '[regex]' : '[fixed]'} → ${escapeHtml(rule.fillType)}</span>
-      <button type="button" class="btn btn-danger delRule" data-i="${i}" aria-label="Remove rule">Remove</button>
+      <span class="fillType">${rule.regex ? 'regex' : 'text'} → ${escapeHtml(rule.fillType)}</span>
+      <button type="button" class="btn-danger delRule" data-i="${i}">×</button>
     </div>`
   ).join('');
   list.querySelectorAll('.delRule').forEach(btn => {

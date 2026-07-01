@@ -160,6 +160,140 @@
     return rand(parts);
   }
 
+  function isDangerousClick(el) {
+    if (!el) return true;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'a') {
+      const href = el.getAttribute('href');
+      if (href && href !== '#' && !href.startsWith('javascript:')) return true;
+    }
+    if (tag === 'button') {
+      const t = (el.getAttribute('type') || 'submit').toLowerCase();
+      if (t === 'submit' || t === 'reset') return true;
+    }
+    if (el.type === 'submit' || el.type === 'reset') return true;
+    return false;
+  }
+
+  function safeClick(el) {
+    if (isDangerousClick(el)) return false;
+    try {
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function getDropdownTrigger(wrapper) {
+    const prefer = wrapper.querySelector('.ant-select-selector, .react-select__control, .react-select__value-container, .MuiSelect-select, .vs__dropdown-toggle, [role=combobox]');
+    if (prefer && !isDangerousClick(prefer)) return prefer;
+    const btn = wrapper.querySelector('button[type="button"], [role=button][aria-haspopup]');
+    return btn && !isDangerousClick(btn) ? btn : null;
+  }
+
+  function isNavOrSearchForm(form) {
+    if (form.closest('header, nav, [role=navigation], .navbar, .header, .topbar')) return true;
+    if (form.getAttribute('role') === 'search') return true;
+    const inputs = form.querySelectorAll('input:not([type=hidden])');
+    return inputs.length === 1 && (inputs[0].type === 'search' || /search/i.test(inputs[0].name + inputs[0].id + inputs[0].placeholder));
+  }
+
+  function getPrimaryForm() {
+    const forms = Array.from(document.querySelectorAll('form')).filter(f => !isNavOrSearchForm(f) && f.querySelectorAll('input:not([type=hidden]), select, textarea').length >= 2);
+    if (!forms.length) return null;
+    return forms.sort((a, b) => b.querySelectorAll('input,select,textarea').length - a.querySelectorAll('input,select,textarea').length)[0];
+  }
+
+  function getFillScope() {
+    return getPrimaryForm() || document.querySelector('main, [role=main], .filament-main, .fi-main, .page-content, .content-area, #content, [class*="main-content"]');
+  }
+
+  function isInExcludedZone(el) {
+    return !!el.closest('header, nav, aside, footer, [role=navigation], [role=banner], .navbar, .sidebar, .fi-sidebar, .fi-topbar, #site-header, #mobile-menu');
+  }
+
+  function beginFillGuard() {
+    const restore = [];
+    const block = (e) => { e.preventDefault(); e.stopImmediatePropagation(); return false; };
+    document.querySelectorAll('form').forEach(f => {
+      f.addEventListener('submit', block, true);
+      const orig = f.submit.bind(f);
+      f.submit = () => {};
+      restore.push(() => { f.removeEventListener('submit', block, true); f.submit = orig; });
+    });
+    ['turbo:before-visit', 'turbo:submit-start', 'htmx:beforeRequest'].forEach(ev => {
+      document.addEventListener(ev, block, true);
+      restore.push(() => document.removeEventListener(ev, block, true));
+    });
+    const blockClick = (e) => {
+      const el = e.target?.closest?.('a[href], button, input[type=submit], input[type=image]');
+      if (el && isDangerousClick(el)) { e.preventDefault(); e.stopImmediatePropagation(); }
+    };
+    document.addEventListener('click', blockClick, true);
+    restore.push(() => document.removeEventListener('click', blockClick, true));
+    const blockEnter = (e) => {
+      if (e.key !== 'Enter' || (e.target?.tagName || '').toLowerCase() === 'textarea') return;
+      if (e.target?.closest?.('form')) { e.preventDefault(); e.stopImmediatePropagation(); }
+    };
+    document.addEventListener('keydown', blockEnter, true);
+    restore.push(() => document.removeEventListener('keydown', blockEnter, true));
+    return () => restore.reverse().forEach(fn => { try { fn(); } catch (e) {} });
+  }
+
+  function fieldCountIn(root) {
+    return (root || document.body).querySelectorAll('input:not([type=hidden]), select, textarea').length;
+  }
+
+  function isAddNewButton(el) {
+    if (!el || isInExcludedZone(el)) return false;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'a') {
+      const href = el.getAttribute('href') || '';
+      if (href && href !== '#' && !href.startsWith('javascript:')) return false;
+    } else if (tag === 'button') {
+      if ((el.getAttribute('type') || 'submit').toLowerCase() !== 'button') return false;
+    } else if (el.getAttribute('role') !== 'button') return false;
+    const text = (el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+    const hint = (text + ' ' + (el.className || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('name') || '')).toLowerCase();
+    if (/remove|delete|cancel|submit|save\b|back|prev|next|close|clear/i.test(text) && !/add/i.test(text)) return false;
+    if (/\b(add|new row|new field|new entry|another|insert|append|repeater)\b/i.test(hint)) return true;
+    if (/add[-_]|btn-add|addnew|add_more|field-add|repeater-add|fi-fo-repeater|fi-ac-action/i.test(hint)) return true;
+    if (/^\+$|^add$/i.test(text)) return true;
+    if (/plus|fa-plus|icon-plus/i.test(hint) && text.length < 24) return true;
+    return false;
+  }
+
+  async function expandDynamicSections(scope, minAdds = 3) {
+    const root = scope || document.body;
+    const btns = [...new Set(Array.from(root.querySelectorAll('button, [role=button], a')).filter(b => b.offsetParent !== null && isAddNewButton(b) && root.contains(b)))];
+    if (!btns.length) return;
+    for (const btn of btns) {
+      for (let i = 0; i < minAdds; i++) {
+        const before = fieldCountIn(root);
+        safeClick(btn);
+        await new Promise(r => setTimeout(r, 400));
+        if (fieldCountIn(root) <= before) break;
+      }
+    }
+  }
+
+  function buildScopedElements() {
+    const list = { items: [], seen: new Set(), seenEl: new Set() };
+    collectFromRoot(document, list);
+    list.items.sort((a, b) => {
+      const rectA = a.el.getBoundingClientRect(), rectB = b.el.getBoundingClientRect();
+      const topDiff = (rectA.top + window.scrollY) - (rectB.top + window.scrollY);
+      return Math.abs(topDiff) > 10 ? topDiff : rectA.left - rectB.left;
+    });
+    const seen = new Set(), unique = [];
+    for (const item of list.items) {
+      if (!seen.has(item.el)) { seen.add(item.el); unique.push(item); }
+    }
+    const fillScope = getFillScope();
+    return unique.filter(item => !isInExcludedZone(item.el) && (!fillScope || fillScope.contains(item.el)));
+  }
+
   function getValueByType(fillType, ctx, opts) {
     const rulePattern = (opts && opts.rulePattern) ? String(opts.rulePattern) : '';
     const fromCustomRule = !!(opts && opts.fromCustomRule);
@@ -240,7 +374,8 @@
       el.name, el.id, el.placeholder, (el.className && typeof el.className === 'string' ? el.className : ''),
       el.getAttribute?.('data-field') || '', el.getAttribute?.('data-testid') || '', el.getAttribute?.('data-name') || '',
       el.getAttribute?.('data-label') || '', el.getAttribute?.('formcontrolname') || '', el.getAttribute?.('name') || '',
-      el.getAttribute?.('ng-reflect-name') || ''
+      el.getAttribute?.('ng-reflect-name') || '', el.getAttribute?.('autocomplete') || '', el.getAttribute?.('title') || '',
+      el.getAttribute?.('inputmode') || ''
     ].filter(Boolean).join(' ').toLowerCase();
     let label = "";
     const root = el.getRootNode?.()?.host ? el.getRootNode() : document;
@@ -250,12 +385,115 @@
     }
     if (!label && el.previousElementSibling?.tagName === "LABEL") label = el.previousElementSibling.textContent.toLowerCase();
     if (!label) {
-      const parent = el.closest("div, td, th, form, fieldset");
+      const parent = el.closest("div, td, th, form, fieldset, li, p");
       const lbl = parent?.querySelector("label");
       if (lbl) label = lbl.textContent.toLowerCase();
     }
+    if (!label) {
+      const fs = el.closest("fieldset");
+      const legend = fs?.querySelector("legend");
+      if (legend) label = legend.textContent.toLowerCase();
+    }
     const aria = (el.getAttribute?.("aria-label") || el.getAttribute?.("aria-labelledby") || el.getAttribute?.("aria-placeholder") || "").toLowerCase();
     return (attrs + " " + label + " " + aria).trim();
+  }
+
+  function detectFieldType(el, ctx) {
+    const ac = (el.getAttribute?.('autocomplete') || '').toLowerCase().replace(/^section-\w+\s+/, '');
+    if (ac && ac !== 'off' && ac !== 'nope') {
+      if (/email/.test(ac)) return 'email';
+      if (/tel|mobile/.test(ac)) return 'phone';
+      if (/given-name|fname/.test(ac)) return 'name:first';
+      if (/family-name|lname|surname/.test(ac)) return 'name:last';
+      if (/^name$|full-name/.test(ac)) return 'name:full';
+      if (/username/.test(ac)) return 'name:username';
+      if (/street-address|address-line/.test(ac)) return 'address';
+      if (/postal|postal-code|zip/.test(ac)) return 'address:zip';
+      if (/address-level2|city|locality/.test(ac)) return 'address:city';
+      if (/country/.test(ac)) return 'address:country';
+      if (/organization|company/.test(ac)) return 'company';
+      if (/bday|birthday/.test(ac)) return 'date:birth';
+      if (/password/.test(ac)) return 'password';
+      if (/url|website/.test(ac)) return 'url';
+    }
+    const type = el.type || '';
+    if (type === 'email') return 'email';
+    if (type === 'tel') return 'phone';
+    if (type === 'password') return 'password';
+    if (type === 'url') return 'url';
+    if (type === 'number') return 'number';
+    if (type === 'date') return /birth|dob/i.test(ctx) ? 'date:birth' : 'date';
+    if (type === 'datetime-local' || type === 'time' || type === 'month' || type === 'week') return 'date';
+
+    const rules = [
+      [/national.*id|nid\b|passport|voter|birth.*cert/i, 'nid'],
+      [/confirm.*pass|re-?type.*pass|pass.*confirm|pass.*again/i, 'password'],
+      [/first.*name|given.*name|fname/i, 'name:first'],
+      [/middle.*name|mname/i, 'name:middle'],
+      [/last.*name|sur.*name|family.*name|lname/i, 'name:last'],
+      [/full.*name|complete.*name|student.*name|applicant.*name/i, 'name:full'],
+      [/(?:^|\b)name(?:\b|$)/i, 'name:full'],
+      [/user.*name|username|login/i, 'name:username'],
+      [/(?:phone|mobile|cell|tel|whatsapp|contact.*number|mobile.*no|phone.*no)\b/i, 'phone'],
+      [/e-?mail|email.*address/i, 'email'],
+      [/father|mother|parent|guardian|spouse|husband|wife/i, 'name:full'],
+      [/company|organization|employer|institute|school|college|university/i, 'company'],
+      [/street|address.*line|residence|permanent.*address|present.*address/i, 'address'],
+      [/\bcity\b|town|municipality|upazila/i, 'address:city'],
+      [/zip|post.*code|postal|pin.*code/i, 'address:zip'],
+      [/country|nation(?!al)/i, 'address:country'],
+      [/district|division|state|region|thana/i, 'address:city'],
+      [/birth|dob|b\.?d|date.*of.*birth/i, 'date:birth'],
+      [/\bdate\b|join.*date|start.*date|end.*date|expir/i, 'date'],
+      [/roll|student.*id|registration.*num|reg.*no|serial/i, 'number'],
+      [/age|year.*old|qty|quantity|amount|count|salary|price|gpa|cgpa/i, 'number'],
+      [/desc|about|note|comment|remark|detail|message|bio|summary/i, 'textarea'],
+      [/url|website|link|linkedin|facebook|github/i, 'url']
+    ];
+    for (const [re, t] of rules) if (re.test(ctx)) return t;
+    if (el.getAttribute?.('inputmode') === 'email') return 'email';
+    if (el.getAttribute?.('inputmode') === 'tel') return 'phone';
+    if (el.getAttribute?.('inputmode') === 'numeric') return 'number';
+    return null;
+  }
+
+  function valueFromDetected(detected, ctx, set, phoneFormat, session) {
+    const [type, sub] = detected.split(':');
+    const settingKey = type === 'name' ? 'name' : type;
+    if (!set(settingKey)) return '';
+    if (type === 'name') {
+      if (!session.name) session.name = fakeName();
+      const parts = session.name.split(' ');
+      if (sub === 'first') return parts[0] || rand(firstNames);
+      if (sub === 'last') return parts.slice(1).join(' ') || rand(lastNames);
+      if (sub === 'middle') return rand(firstNames);
+      if (sub === 'username') return session.name.toLowerCase().replace(/\s+/g, '') + randInt(1, 99);
+      return session.name;
+    }
+    if (type === 'email') {
+      if (!session.email) session.email = fakeEmailForContext(ctx);
+      return session.email;
+    }
+    if (type === 'phone') {
+      if (!session.phone) session.phone = phoneFormat === 'international' ? fakePhone() : fakePhoneLocal();
+      return session.phone;
+    }
+    if (type === 'address') {
+      if (sub === 'city') return fakeCity();
+      if (sub === 'zip') return fakePostcode();
+      if (sub === 'country') return 'Bangladesh';
+      return fakeAddress();
+    }
+    if (type === 'date') {
+      const df = getDateFormatFromContext(ctx);
+      if (sub === 'birth') return fakeBirthDateFormatted(df);
+      if (/admission|join|enroll/i.test(ctx)) {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      }
+      return fakeDateFormatted(df);
+    }
+    return getValueByType(type, ctx, { phoneFormat });
   }
 
   /* Framework-safe: React, Vue, Angular, Next.js all pick up native input/change. */
@@ -273,16 +511,17 @@
       }
       el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: value }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      el.dispatchEvent(new Event('blur', { bubbles: true }));
     } catch (e) { el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }
   }
 
   // --- Input Fills (set, customRules, phoneFormat, customFiles) ---
-  function guessAndFillInput(el, set, customRules, phoneFormat, customFiles) {
+  function guessAndFillInput(el, set, customRules, phoneFormat, customFiles, session) {
     if (phoneFormat === undefined) phoneFormat = 'local';
     if (el.disabled || el.type === "hidden") return;
     if (el.readOnly && !el.classList.contains("flatpickr-input")) return;
+    if (el.value && String(el.value).trim() && el.type !== 'checkbox' && el.type !== 'file') return;
     customFiles = customFiles || {};
+    session = session || {};
 
     const ctx = getFieldContext(el);
     if (!set) set = () => true;
@@ -290,7 +529,6 @@
     if (el.type === "checkbox") {
       if (!set("checkbox")) return;
       el.checked = Math.random() > 0.35;
-      el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
       return;
@@ -424,90 +662,26 @@
     }
 
     if (!value) {
-    if (el.type === "date") {
-      if (!set("date")) return;
-      if (/birth|dob|b\.?d/i.test(ctx)) value = fakeBirthDateISO();
-      else if (/admission|join|enroll/i.test(ctx)) {
-        const d = new Date();
-        value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-      } else value = fakeDateISO();
-    } else if (el.type === "datetime-local") {
-      if (!set("date")) return;
-      value = new Date().toISOString().slice(0, 16);
-    } else if (el.type === "time") {
-      if (!set("date")) return;
-      value = "09:00";
-    } else if (el.type === "month") {
-      if (!set("date")) return;
-      value = new Date().toISOString().slice(0, 7);
-    } else if (el.type === "week") {
-      if (!set("date")) return;
-      value = new Date().getFullYear() + "-W01";
-    } else if (/birth|dob|b\.?d/i.test(ctx) && /date/i.test(ctx)) {
-      if (!set("date")) return;
-      value = fakeBirthDateFormatted(getDateFormatFromContext(ctx));
-    } else if (/date/i.test(ctx)) {
-      if (!set("date")) return;
-      if (/admission|join|enroll/i.test(ctx)) {
-        const d = new Date();
-        value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-      } else {
-        value = fakeDateFormatted(getDateFormatFromContext(ctx));
+      const detected = detectFieldType(el, ctx);
+      if (detected) {
+        if (detected.startsWith('date') && el.type === 'date') {
+          if (set('date')) value = detected === 'date:birth' ? fakeBirthDateISO() : fakeDateISO();
+        } else if (detected === 'date' && el.type === 'datetime-local') {
+          if (set('date')) value = new Date().toISOString().slice(0, 16);
+        } else if (detected === 'date' && el.type === 'time') {
+          if (set('date')) value = '09:00';
+        } else if (detected === 'date' && el.type === 'month') {
+          if (set('date')) value = new Date().toISOString().slice(0, 7);
+        } else if (detected === 'date' && el.type === 'week') {
+          if (set('date')) value = new Date().getFullYear() + '-W01';
+        } else {
+          value = valueFromDetected(detected, ctx, set, phoneFormat, session);
+        }
+      } else if (el.type === 'number' || el.getAttribute('inputmode') === 'numeric') {
+        if (set('number')) value = String(randInt(1, 99));
+      } else if (el.type === 'text' || el.type === 'search' || !el.type) {
+        if (set('name')) value = 'Test';
       }
-    } else if (/roll|student.*num|registration.*num/i.test(ctx)) {
-      if (set("number")) value = fakeNumberForContext(ctx);
-    } else if (el.type === "email" || /e?-?mail/i.test(ctx)) {
-      if (!set("email")) return;
-      value = fakeEmailForContext(ctx);
-    } else if (el.type === "tel" || /phone|mobile|contact|cell|tel/i.test(ctx)) {
-      if (!set("phone")) return;
-      value = phoneFormat === 'international' ? fakePhone() : fakePhoneLocal();
-    } else if (/first.*name|given.*name|fname/i.test(ctx)) {
-      if (!set("name")) return;
-      value = rand(firstNames);
-    } else if (/middle.*name|mname/i.test(ctx)) {
-      if (set("name")) value = rand(firstNames);
-    } else if (/last.*name|sur.*name|family.*name|lname/i.test(ctx)) {
-      if (set("name")) value = rand(lastNames);
-    } else if (/full.*name|complete.*name|student.*name|person.*name/i.test(ctx) || /^\s*name\s*$/i.test(ctx)) {
-      if (set("name")) value = fakeName();
-    } else if (/user.*name|username|login/i.test(ctx)) {
-      if (set("name")) value = fakeName().toLowerCase().replace(/\s+/g, "");
-    } else if (/father|parent|guardian/i.test(ctx) && /name/i.test(ctx)) {
-      if (set("name")) value = fakeName();
-    } else if (/mother/i.test(ctx) && /name/i.test(ctx)) {
-      if (set("name")) value = rand(firstNames) + " " + rand(lastNames);
-    } else if (/company|organization|employer|institute|school/i.test(ctx)) {
-      if (!set("company")) return;
-      value = fakeCompany();
-    } else if (/address|street|location|residence/i.test(ctx)) {
-      if (!set("address")) return;
-      value = fakeAddress();
-    } else if (/city|town|municipality/i.test(ctx)) {
-      if (set("address")) value = fakeCity();
-    } else if (/zip|post.*code|pin/i.test(ctx)) {
-      if (set("address")) value = fakePostcode();
-    } else if (/country|nation(?!al)/i.test(ctx)) {
-      if (set("address")) value = "Bangladesh";
-    } else if (/district|state|division|region/i.test(ctx)) {
-      if (set("address")) value = "Dhaka";
-    } else if (/national.*id|nid|passport/i.test(ctx)) {
-      if (!set("nid")) return;
-      value = fakeNidForContext(ctx);
-    } else if (el.type === "number" || /age|year.*old|qty|quantity|amount|count/i.test(ctx)) {
-      if (set("number")) value = fakeNumberForContext(ctx);
-    } else if (/password|passwd|pwd/i.test(ctx) || el.type === "password") {
-      if (!set("password")) return;
-      value = fakePasswordForContext(ctx);
-    } else if (/desc|about|note|comment|remark|detail/i.test(ctx)) {
-      if (!set("textarea")) return;
-      value = fakeSentence();
-    } else if (/url|website|link/i.test(ctx)) {
-      if (!set("url")) return;
-      value = fakeUrlForContext(ctx);
-    } else if (el.type === "text" || el.type === "search" || !el.type) {
-      if (!el.value && set("name")) value = fakeName();
-    }
     }
 
     if (value) {
@@ -522,9 +696,10 @@
     }
   }
 
-  function fillRadiosByGroup() {
+  function fillRadiosByGroup(root) {
+    const scope = root || document;
     const groups = {};
-    document.querySelectorAll("input[type=radio]").forEach(r => {
+    scope.querySelectorAll("input[type=radio]").forEach(r => {
       if (r.disabled) return;
       const name = r.name || ("__no_group__" + Math.random());
       (groups[name] ||= []).push(r);
@@ -533,7 +708,6 @@
       if (!list.length) return;
       const choice = rand(list);
       choice.checked = true;
-      choice.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
       choice.dispatchEvent(new Event("input", { bubbles: true }));
       choice.dispatchEvent(new Event("change", { bubbles: true }));
     });
@@ -583,12 +757,12 @@
       const selector = antSel.querySelector(".ant-select-selector");
       if (selector) {
         return new Promise(resolve => {
-          selector.click();
+          safeClick(selector);
           const tryPick = (attempt = 0) => {
             if (attempt > 12) { resolve(); return; }
             const items = document.querySelectorAll(".ant-select-dropdown .ant-select-item:not(.ant-select-item-disabled)");
-            const vis = Array.from(items).filter(o => o.getBoundingClientRect().height > 0);
-            if (vis.length > 0) { rand(vis).click(); setTimeout(resolve, 80); return; }
+            const vis = Array.from(items).filter(o => o.getBoundingClientRect().height > 0 && !isDangerousClick(o));
+            if (vis.length > 0) { safeClick(rand(vis)); setTimeout(resolve, 80); return; }
             setTimeout(() => tryPick(attempt + 1), 120);
           };
           setTimeout(() => tryPick(0), 150);
@@ -601,12 +775,12 @@
       const control = reactSel.querySelector(".react-select__control");
       if (control) {
         return new Promise(resolve => {
-          control.click();
+          safeClick(control);
           const tryPick = (attempt = 0) => {
             if (attempt > 12) { resolve(); return; }
             const opts = document.querySelectorAll(".react-select__menu .react-select__option:not([class*='disabled'])");
-            const vis = Array.from(opts).filter(o => o.getBoundingClientRect().height > 0);
-            if (vis.length > 0) { rand(vis).click(); setTimeout(resolve, 80); return; }
+            const vis = Array.from(opts).filter(o => o.getBoundingClientRect().height > 0 && !isDangerousClick(o));
+            if (vis.length > 0) { safeClick(rand(vis)); setTimeout(resolve, 80); return; }
             setTimeout(() => tryPick(attempt + 1), 120);
           };
           setTimeout(() => tryPick(0), 150);
@@ -650,8 +824,9 @@
         let isOpen = (toggle && toggle.getAttribute("aria-expanded") === "true");
         if (isOpen) return true;
         for (const t of triggers) {
+          if (isDangerousClick(t)) continue;
           t.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
-          t.click();
+          safeClick(t);
           t.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
         }
         return false;
@@ -680,7 +855,7 @@
             const options = Array.from(listbox.querySelectorAll("li, .vs__dropdown-option, .select2-results__option, .ant-select-item, .react-select__option, .MuiListItem-root, .mat-option, [role=option]"))
               .filter(o => {
                 const t = o.textContent.trim().toLowerCase();
-                return t && !o.classList.contains("disabled") && o.getAttribute("aria-disabled") !== "true" && !t.includes("loading");
+                return t && !isDangerousClick(o) && !o.classList.contains("disabled") && o.getAttribute("aria-disabled") !== "true" && !t.includes("loading");
               });
 
             if (options.length > 0) {
@@ -702,9 +877,7 @@
 
               if (pick) {
                 pick.scrollIntoView({ block: "nearest" });
-                pick.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
-                pick.click();
-                pick.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+                safeClick(pick);
                 setTimeout(resolve, 50);
                 return;
               }
@@ -720,22 +893,21 @@
   async function processCustomDropdown(wrapper) {
     if (wrapper.getAttribute("aria-disabled") === "true") return;
 
-    const btn = wrapper.querySelector("button, [role=button], .dropdown-toggle, .ant-select-selector, .react-select__control, .react-select__value-container, .MuiSelect-select, [class*='MuiInputBase']");
+    const btn = getDropdownTrigger(wrapper);
     if (!btn || (btn.disabled && btn.getAttribute?.("aria-disabled") !== "true")) return;
     if (btn.disabled && btn.tagName === "BUTTON") return;
 
     return new Promise(resolve => {
-      btn.click();
+      safeClick(btn);
       const tryPick = (attempt = 0) => {
         if (attempt > 8) { resolve(); return; }
-        const selectors = '[role="option"]:not([aria-disabled=true]), .dropdown-item:not(.disabled), .ant-select-item, .react-select__option, .MuiListItem-root, .mat-option, [class*="option"]';
+        const selectors = '[role="option"]:not([aria-disabled=true]), .dropdown-item:not(.disabled), .ant-select-item, .react-select__option, .MuiListItem-root, .mat-option';
         const opts = Array.from(document.querySelectorAll(selectors)).filter(o => {
           const r = o.getBoundingClientRect();
-          return r.width > 2 && r.height > 2 && getComputedStyle(o).display !== 'none' && !/select|choose|loading/i.test(o.textContent?.trim() || '');
+          return r.width > 2 && r.height > 2 && !isDangerousClick(o) && getComputedStyle(o).display !== 'none' && !/select|choose|loading/i.test(o.textContent?.trim() || '');
         });
         if (opts.length > 0) {
-          const choice = rand(opts);
-          choice.click();
+          safeClick(rand(opts));
           setTimeout(resolve, 80);
         } else setTimeout(() => tryPick(attempt + 1), 150);
       };
@@ -768,13 +940,13 @@
       list.seenEl.add(el);
       const hasInput = el.querySelector("input");
       if (hasInput && !list.seenEl.has(hasInput)) { list.seenEl.add(hasInput); list.items.push({ type: 'vue-select', el: hasInput }); }
-      else { const btn = el.querySelector("button, [role=button]"); if (btn) list.items.push({ type: 'custom-dropdown', el: el }); }
+      else { const btn = el.querySelector('button[type="button"], [role=button][aria-haspopup]'); if (btn && !isDangerousClick(btn)) list.items.push({ type: 'custom-dropdown', el: el }); }
     });
-    q(".dropdown, .custom-select, .ant-select, .react-select__control, .react-select, .MuiSelect-select, mat-select").forEach(el => {
+    q(".custom-select, .ant-select, .react-select__control, .react-select, .MuiSelect-select, mat-select, .v-select, .vue-select").forEach(el => {
       if (list.seenEl.has(el)) return;
       const input = el.querySelector("input:not([type=hidden])");
       if (input && !list.seenEl.has(input)) { list.seenEl.add(input); list.seenEl.add(el); list.items.push({ type: 'vue-select', el: input }); }
-      else { const btn = el.querySelector("button, [role=button], .ant-select-selector, .react-select__control, .react-select__value-container"); if (btn) { list.seenEl.add(el); list.items.push({ type: 'custom-dropdown', el: el }); } }
+      else { const btn = getDropdownTrigger(el); if (btn) { list.seenEl.add(el); list.items.push({ type: 'custom-dropdown', el: el }); } }
     });
     try { q("*").forEach(el => { if (el.shadowRoot) collectFromRoot(el.shadowRoot, list); }); } catch (err) {}
   }
@@ -796,28 +968,6 @@
       regex: rule.regex === true
     })) : [];
 
-
-    const list = { items: [], seen: new Set(), seenEl: new Set() };
-    collectFromRoot(document, list);
-    const allElements = list.items;
-
-    // Sort visible order
-    allElements.sort((a, b) => {
-      const rectA = a.el.getBoundingClientRect();
-      const rectB = b.el.getBoundingClientRect();
-      const topDiff = (rectA.top + window.scrollY) - (rectB.top + window.scrollY);
-      if (Math.abs(topDiff) > 10) return topDiff;
-      return rectA.left - rectB.left;
-    });
-
-    // Unique
-    const uniqueElements = [];
-    const seen = new Set();
-    for (const item of allElements) {
-      if (!seen.has(item.el)) { seen.add(item.el); uniqueElements.push(item); }
-    }
-
-    // Load custom files right before use so settings changes take effect
     const customFilesData = await new Promise(res => {
       chrome.storage.local.get(["customFiles"], (data) => {
         const cf = data.customFiles;
@@ -830,14 +980,18 @@
       });
     });
 
-    // Process Loop
-    for (const item of uniqueElements) {
+    const session = {};
+    const endGuard = beginFillGuard();
+    try {
+    const fillScope = getFillScope();
+    await expandDynamicSections(fillScope, 3);
+    const primaryForm = getPrimaryForm();
+    const scopedElements = buildScopedElements();
+    for (const item of scopedElements) {
       const { type, el } = item;
 
       if (el.offsetParent === null && type !== 'vue-select' && el.type !== 'file') continue;
       if ((el.disabled || el.readOnly) && !el.classList.contains("flatpickr-input") && type !== 'vue-select') continue;
-
-      smoothScrollTo(el);
 
       const originalShadow = el.style.boxShadow;
       const originalTrans = el.style.transition;
@@ -850,7 +1004,7 @@
         } else if (type === 'custom-dropdown') {
           if (set("select")) await withTimeout(processCustomDropdown(el), 1200);
         } else if (type === 'input') {
-          guessAndFillInput(el, set, customRules, phoneFormat, customFilesData);
+          guessAndFillInput(el, set, customRules, phoneFormat, customFilesData, session);
           if (el.type === 'file') await new Promise(r => setTimeout(r, 150));
           else await new Promise(r => setTimeout(r, 60));
         } else if (type === 'textarea') {
@@ -897,8 +1051,12 @@
       }, 300);
     }
 
-    if (set("radio")) fillRadiosByGroup();
+    if (set("radio")) fillRadiosByGroup(primaryForm);
     if (set("select")) fillSelect2();
+    await new Promise(r => setTimeout(r, 400));
+    } finally {
+      endGuard();
+    }
   };
 
   /* --- Keyboard Shortcut: Ctrl + Shift + V + V (controlled by storage) --- */

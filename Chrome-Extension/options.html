@@ -3,403 +3,289 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Settings · Fake Data Filler</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+  <title>Settings · AutoForm Fill</title>
   <style>
     :root {
-      --bg: #0c0f14;
-      --surface: rgba(30, 35, 45, 0.7);
-      --surface-hover: rgba(40, 48, 62, 0.8);
-      --border: rgba(255,255,255,.06);
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --accent: #22d3ee;
-      --accent-dim: rgba(34, 211, 238, .15);
-      --success: #34d399;
-      --danger: #f87171;
-      --danger-bg: rgba(248,113,113,.12);
-      --radius: 14px;
-      --radius-sm: 10px;
-      --shadow: 0 4px 24px rgba(0,0,0,.25);
-      --transition: .2s ease;
+      --text: #111;
+      --muted: #666;
+      --border: #e5e5e5;
+      --bg: #fafafa;
     }
-    *, *::before, *::after { box-sizing: border-box; }
-    html { min-width: 720px; }
+    * { box-sizing: border-box; margin: 0; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      min-width: 720px;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      background: var(--bg);
+      font: 14px/1.5 system-ui, -apple-system, sans-serif;
       color: var(--text);
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
+      background: #fff;
     }
-    .app {
-      max-width: 960px;
-      min-width: 640px;
-      margin: 0 auto;
-      padding: 32px 24px 48px;
-      width: 100%;
-    }
-    .hero {
-      text-align: center;
-      margin-bottom: 32px;
-      padding: 24px 0;
-    }
-    .hero h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      margin: 0 0 8px 0;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .hero p { margin: 0; font-size: .9375rem; color: var(--text-muted); }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 24px 20px 40px; }
+    h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
 
     .tabs {
       display: flex;
-      flex-wrap: nowrap;
-      gap: 6px;
-      margin-bottom: 24px;
-      padding: 6px;
-      background: var(--surface);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
     }
     .tab {
-      flex: 1;
-      flex-shrink: 0;
-      white-space: nowrap;
-      padding: 12px 16px;
+      padding: 8px 12px;
       border: none;
-      border-radius: 8px;
-      font-family: inherit;
-      font-size: .875rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      background: transparent;
+      background: none;
+      font: inherit;
+      font-size: 13px;
+      color: var(--muted);
       cursor: pointer;
-      transition: color var(--transition), background var(--transition);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
     }
     .tab:hover { color: var(--text); }
-    .tab.active { color: var(--accent); background: var(--accent-dim); }
-    .panel { display: none; animation: fadeIn .3s ease; }
+    .tab.active { color: var(--text); font-weight: 500; border-bottom-color: #111; }
+    .panel { display: none; }
     .panel.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-    .card {
-      background: var(--surface);
+    .section {
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      margin-bottom: 20px;
-      backdrop-filter: blur(12px);
-      box-shadow: var(--shadow);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: var(--bg);
     }
-    .card-title {
-      font-size: .8125rem;
+    .section h2 {
+      font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: .06em;
-      color: var(--text-muted);
-      margin: 0 0 20px 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin-bottom: 12px;
     }
-    .card-title .icon { width: 20px; height: 20px; opacity: .8; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    kbd {
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-size: 11px;
+      background: #fff;
+    }
 
-    .setting-row {
+    .row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      padding: 14px 0;
-      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      padding: 8px 0;
     }
-    .setting-row:last-child { border-bottom: none; padding-bottom: 0; }
-    .setting-row:first-child { padding-top: 0; }
-    .setting-label { font-size: .9375rem; font-weight: 500; cursor: pointer; user-select: none; flex: 1; }
-    .setting-hint { font-size: .8125rem; color: var(--text-muted); margin: 10px 0 0 0; line-height: 1.45; }
-    kbd { padding: 3px 8px; background: rgba(255,255,255,.08); border-radius: 6px; font-size: .75rem; font-family: inherit; }
+    .row + .row { border-top: 1px solid var(--border); }
+    .row label { font-size: 13px; flex: 1; cursor: pointer; }
 
     .switch {
-      width: 48px; height: 26px;
-      background: rgba(255,255,255,.1);
-      border-radius: 13px;
+      width: 36px;
+      height: 20px;
+      background: #ccc;
+      border-radius: 10px;
       position: relative;
       cursor: pointer;
       flex-shrink: 0;
-      transition: background var(--transition);
-      border: 1px solid var(--border);
     }
-    .switch:hover { background: rgba(255,255,255,.15); }
-    .switch.on { background: var(--accent); border-color: var(--accent); }
+    .switch.on { background: #111; }
     .switch::after {
       content: "";
       position: absolute;
-      width: 22px; height: 22px;
+      width: 16px;
+      height: 16px;
       background: #fff;
       border-radius: 50%;
-      top: 1px; left: 1px;
-      transition: transform var(--transition);
-      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+      top: 2px;
+      left: 2px;
+      transition: transform .15s;
     }
-    .switch.on::after { transform: translateX(22px); }
+    .switch.on::after { transform: translateX(16px); }
 
-    .field-actions {
+    select, input[type=text], input[type=file] {
+      font: inherit;
+      font-size: 13px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+    }
+    select { cursor: pointer; }
+
+    .field-toolbar {
       display: flex;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 18px;
+      margin-bottom: 12px;
       flex-wrap: wrap;
     }
-    .field-actions .btn-sm {
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: .8125rem;
-      font-weight: 600;
+    .field-toolbar span { margin-left: auto; font-size: 12px; color: var(--muted); }
+    .btn-sm {
+      padding: 5px 10px;
+      font: inherit;
+      font-size: 12px;
       border: 1px solid var(--border);
-      background: var(--surface-hover);
-      color: var(--text-muted);
+      border-radius: 6px;
+      background: #fff;
       cursor: pointer;
-      font-family: inherit;
-      transition: all var(--transition);
     }
-    .field-actions .btn-sm:hover { color: var(--text); border-color: rgba(255,255,255,.12); }
-    .field-count { font-size: .8125rem; color: var(--text-muted); align-self: center; margin-left: auto; }
+    .btn-sm:hover { background: var(--bg); }
 
     .field-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
     }
     .field-chip {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      padding: 12px 14px;
-      background: rgba(255,255,255,.04);
+      gap: 8px;
+      padding: 8px 10px;
+      background: #fff;
       border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      transition: border-color var(--transition), background var(--transition);
+      border-radius: 6px;
     }
-    .field-chip:hover { background: rgba(255,255,255,.06); }
-    .field-chip .label { font-size: .875rem; font-weight: 500; }
-    .field-chip .switch { width: 40px; height: 22px; }
-    .field-chip .switch::after { width: 18px; height: 18px; }
-    .field-chip .switch.on::after { transform: translateX(18px); }
+    .field-chip .label { font-size: 13px; }
 
     .rules-empty {
+      padding: 20px;
       text-align: center;
-      padding: 40px 24px;
-      background: rgba(255,255,255,.02);
+      color: var(--muted);
+      font-size: 13px;
       border: 1px dashed var(--border);
-      border-radius: var(--radius-sm);
-      margin-bottom: 20px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      background: #fff;
     }
-    .rules-empty .illus { font-size: 2.5rem; margin-bottom: 12px; opacity: .5; }
-    .rules-empty p { margin: 0; font-size: .9375rem; color: var(--text-muted); }
-    .rules-empty .hint { font-size: .8125rem; margin-top: 6px; }
-
-    .add-rule-form {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .add-rule-form input,
-    .add-rule-form select {
-      padding: 12px 14px;
-      background: rgba(0,0,0,.25);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      font-size: .875rem;
-      font-family: inherit;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-    .add-rule-form input { flex: 1; min-width: 140px; }
-    .add-rule-form input::placeholder { color: var(--text-muted); opacity: .8; }
-    .add-rule-form input:focus,
-    .add-rule-form select:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim);
-    }
-    .add-rule-form select { min-width: 140px; cursor: pointer; }
-
-    .btn {
-      padding: 12px 20px;
-      border-radius: var(--radius-sm);
-      font-size: .875rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      border: none;
-      transition: transform .05s, opacity var(--transition);
-    }
-    .btn:active { transform: scale(0.98); }
-    .btn-primary { background: var(--accent); color: #0c0f14; }
-    .btn-primary:hover { opacity: .92; }
-    .btn-ghost { background: transparent; color: var(--text-muted); }
-    .btn-ghost:hover { color: var(--text); }
-    .btn-danger { padding: 8px 14px; font-size: .8125rem; background: var(--danger-bg); color: var(--danger); border-radius: 8px; }
-    .btn-danger:hover { background: rgba(248,113,113,.2); }
-
-    .rule-list { display: flex; flex-direction: column; gap: 8px; }
+    .rule-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
     .rule-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      background: rgba(0,0,0,.2);
+      gap: 8px;
+      padding: 8px 10px;
+      background: #fff;
       border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-size: .875rem;
-      transition: border-color var(--transition);
+      border-radius: 6px;
+      font-size: 13px;
     }
-    .rule-item:hover { border-color: rgba(255,255,255,.1); }
-    .rule-item .pattern { flex: 1; word-break: break-all; color: var(--text); }
-    .rule-item .arrow { color: var(--text-muted); font-size: .75rem; }
-    .rule-item .fillType { color: var(--accent); font-weight: 500; min-width: 70px; }
+    .rule-item .pattern { flex: 1; word-break: break-all; }
+    .rule-item .fillType { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
-    .footer-actions { text-align: center; padding-top: 16px; }
-    .footer-actions .btn { font-size: .8125rem; }
+    .add-rule {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .add-rule input[type=text] { flex: 1; min-width: 120px; }
+    .add-rule label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+
+    .btn {
+      padding: 8px 14px;
+      font: inherit;
+      font-size: 13px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary { background: #111; color: #fff; }
+    .btn-primary:hover { background: #333; }
+    .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .btn-danger {
+      padding: 4px 8px;
+      font-size: 12px;
+      background: #fff;
+      color: #c00;
+      border: 1px solid #fcc;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .footer { text-align: center; margin-top: 16px; }
+    #customFilesStatus { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,.5);
+      background: rgba(0,0,0,.3);
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 100;
       padding: 16px;
     }
     .modal-overlay.show { display: flex; }
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 24px;
-      max-width: 520px;
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 360px;
       width: 100%;
-      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
     }
-    .modal h3 { margin: 0 0 12px 0; font-size: 1.125rem; }
-    .modal p { margin: 0 0 24px 0; font-size: .9375rem; color: var(--text-muted); line-height: 1.5; }
-    .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
-    .modal-actions .btn { min-width: 80px; }
+    .modal h3 { font-size: 15px; margin-bottom: 8px; }
+    .modal p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
     .toast {
       position: fixed;
-      bottom: 28px;
+      bottom: 20px;
       left: 50%;
-      transform: translateX(-50%) translateY(100px);
-      padding: 14px 24px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-size: .875rem;
-      font-weight: 500;
-      color: var(--text);
+      transform: translateX(-50%) translateY(20px);
+      padding: 8px 16px;
+      background: #111;
+      color: #fff;
+      font-size: 13px;
+      border-radius: 6px;
       opacity: 0;
-      transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s;
-      z-index: 200;
-      box-shadow: 0 12px 40px rgba(0,0,0,.35);
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
     }
-    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-    .toast .check { color: var(--success); font-size: 1.125rem; }
-
-    code { font-size: .8125rem; padding: 2px 6px; background: rgba(255,255,255,.06); border-radius: 4px; }
-    .support-msg { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px; padding: 14px; background: rgba(0,0,0,.2); border-radius: var(--radius-sm); border-left: 3px solid var(--accent); }
-    .support-msg p { margin: 0; }
-    .support-msg strong { color: var(--text); }
-    @media (max-width: 640px) {
-      html, body { min-width: 0; }
-      .app { min-width: 0; padding: 24px 16px 40px; }
-      .field-grid { grid-template-columns: 1fr; }
-    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header class="hero">
-      <h1>Fake Data Filler</h1>
-      <p>Fill forms with realistic fake data. Control every detail here.</p>
-    </header>
+  <div class="wrap">
+    <h1>Settings</h1>
+    <p class="sub">AutoForm Fill — fake data for form testing</p>
 
     <nav class="tabs" role="tablist">
-      <button type="button" class="tab active" role="tab" aria-selected="true" data-panel="general">General</button>
-      <button type="button" class="tab" role="tab" aria-selected="false" data-panel="fields">Field types</button>
-      <button type="button" class="tab" role="tab" aria-selected="false" data-panel="rules">Custom rules</button>
+      <button type="button" class="tab active" data-panel="general">General</button>
+      <button type="button" class="tab" data-panel="fields">Fields</button>
+      <button type="button" class="tab" data-panel="rules">Rules</button>
     </nav>
 
-    <section id="panel-general" class="panel active" role="tabpanel">
-      <p class="support-msg" style="margin-top:0">Use these options to turn the fill shortcut on or off. When enabled, you can press <strong>Ctrl+Shift+V</strong> twice on any page to fill the form.</p>
-      <div class="card">
-        <h2 class="card-title">
-          <span class="icon" aria-hidden="true">⌨️</span>
-          Keyboard shortcut
-        </h2>
-        <div class="setting-row">
-          <label for="shortcutToggle" class="setting-label">Use double-tap shortcut on pages</label>
+    <section id="panel-general" class="panel active">
+      <div class="section">
+        <h2>Shortcut</h2>
+        <div class="row">
+          <label for="shortcutToggle">Enable <kbd>Ctrl+Shift+V</kbd> ×2</label>
           <div id="shortcutToggle" class="switch on" role="switch" aria-checked="true" tabindex="0"></div>
         </div>
-        <p class="setting-hint">Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>V</kbd> twice quickly on any page to fill the form. You can also use the extension icon.</p>
-        <div class="setting-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-          <label for="phoneFormat" class="setting-label">Phone number format (Bangladesh)</label>
-          <select id="phoneFormat" aria-label="Phone format" style="padding:8px 12px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px">
-            <option value="local">Local (01XXXXXXXXX)</option>
-            <option value="international">International (+8801XXXXXXXXX)</option>
+        <div class="row">
+          <label for="phoneFormat">Phone format</label>
+          <select id="phoneFormat">
+            <option value="local">01XXXXXXXXX</option>
+            <option value="international">+8801XXXXXXXXX</option>
           </select>
         </div>
-        <p class="setting-hint" style="margin-top:6px">Default is Bangladeshi local. Change here to use +88 format.</p>
       </div>
-      <div class="card" style="margin-top:20px">
-        <h2 class="card-title">
-          <span class="icon" aria-hidden="true">📎</span>
-          Custom Files
-        </h2>
-        <p class="setting-hint" style="margin-top:0;margin-bottom:16px">Upload your own files to use for auto-fill. If not set, random demo files are generated.</p>
-        <div class="setting-row">
-          <label for="customImage" class="setting-label">Image file (.jpg, .png)</label>
-          <input type="file" id="customImage" accept="image/*" style="font-size:13px;max-width:280px">
-        </div>
-        <div class="setting-row" style="margin-top:12px">
-          <label for="customPdf" class="setting-label">PDF file (.pdf)</label>
-          <input type="file" id="customPdf" accept=".pdf" style="font-size:13px;max-width:280px">
-        </div>
-        <div class="setting-row" style="margin-top:12px">
-          <label for="customDoc" class="setting-label">Document (.doc, .docx)</label>
-          <input type="file" id="customDoc" accept=".doc,.docx" style="font-size:13px;max-width:280px">
-        </div>
-        <div id="customFilesStatus" style="margin-top:12px;font-size:12px;color:var(--text-muted)"></div>
-        <button type="button" id="clearCustomFiles" class="btn-sm" style="margin-top:12px">Clear all custom files</button>
+      <div class="section">
+        <h2>Custom files</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">Used for file upload fields. Max 2MB each.</p>
+        <div class="row"><label for="customImage">Image</label><input type="file" id="customImage" accept="image/*" /></div>
+        <div class="row"><label for="customPdf">PDF</label><input type="file" id="customPdf" accept=".pdf" /></div>
+        <div class="row"><label for="customDoc">Document</label><input type="file" id="customDoc" accept=".doc,.docx" /></div>
+        <div id="customFilesStatus"></div>
+        <button type="button" id="clearCustomFiles" class="btn-sm" style="margin-top:8px">Clear files</button>
       </div>
     </section>
 
-    <section id="panel-fields" class="panel" role="tabpanel">
-      <p class="support-msg" style="margin-top:0">Choose which <strong>field types</strong> the extension is allowed to fill. Turn off any type you want to leave empty (e.g. turn off Password to never fill password fields). Use <strong>Enable all</strong> or <strong>Disable all</strong> to reset quickly. Custom rules (next tab) can still override per field.</p>
-      <div class="card">
-        <h2 class="card-title">
-          <span class="icon" aria-hidden="true">📋</span>
-          Which fields to fill
-        </h2>
-        <p class="setting-hint" style="margin-top:0;margin-bottom:16px">Toggle each type on or off. The counter shows how many are enabled.</p>
-        <div class="field-actions">
-          <button type="button" id="enableAll" class="btn-sm">Enable all</button>
-          <button type="button" id="disableAll" class="btn-sm">Disable all</button>
-          <span id="fieldCount" class="field-count">14 / 14 on</span>
+    <section id="panel-fields" class="panel">
+      <div class="section">
+        <h2>Field types</h2>
+        <div class="field-toolbar">
+          <button type="button" id="enableAll" class="btn-sm">All on</button>
+          <button type="button" id="disableAll" class="btn-sm">All off</button>
+          <span id="fieldCount">14 / 14 on</span>
         </div>
         <div class="field-grid" id="fieldGrid">
           <div class="field-chip"><span class="label" id="l_name">Name</span><div id="t_name" class="switch on" role="switch" tabindex="0"></div></div>
@@ -407,35 +293,29 @@
           <div class="field-chip"><span class="label" id="l_phone">Phone</span><div id="t_phone" class="switch on" role="switch" tabindex="0"></div></div>
           <div class="field-chip"><span class="label" id="l_address">Address</span><div id="t_address" class="switch on" role="switch" tabindex="0"></div></div>
           <div class="field-chip"><span class="label" id="l_company">Company</span><div id="t_company" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_date">Date / Time</span><div id="t_date" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_checkbox">Checkboxes</span><div id="t_checkbox" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_radio">Radio buttons</span><div id="t_radio" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_select">Dropdowns</span><div id="t_select" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_date">Date</span><div id="t_date" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_checkbox">Checkbox</span><div id="t_checkbox" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_radio">Radio</span><div id="t_radio" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_select">Dropdown</span><div id="t_select" class="switch on" role="switch" tabindex="0"></div></div>
           <div class="field-chip"><span class="label" id="l_textarea">Textarea</span><div id="t_textarea" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_number">Number / Age</span><div id="t_number" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_number">Number</span><div id="t_number" class="switch on" role="switch" tabindex="0"></div></div>
           <div class="field-chip"><span class="label" id="l_password">Password</span><div id="t_password" class="switch on" role="switch" tabindex="0"></div></div>
           <div class="field-chip"><span class="label" id="l_url">URL</span><div id="t_url" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_nid">NID / ID</span><div id="t_nid" class="switch on" role="switch" tabindex="0"></div></div>
-          <div class="field-chip"><span class="label" id="l_file">File Upload</span><div id="t_file" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_nid">NID</span><div id="t_nid" class="switch on" role="switch" tabindex="0"></div></div>
+          <div class="field-chip"><span class="label" id="l_file">File</span><div id="t_file" class="switch on" role="switch" tabindex="0"></div></div>
         </div>
       </div>
     </section>
 
-    <section id="panel-rules" class="panel" role="tabpanel">
-      <div class="card">
-        <h2 class="card-title">
-          <span class="icon" aria-hidden="true">✨</span>
-          Custom rules
-        </h2>
-        <div class="support-msg" role="status">
-          <p><strong>What to do:</strong> Add rules below so the extension knows how to fill fields that don’t match the default types. Each rule has a <strong>pattern</strong> (text or regex to match the field’s name, placeholder, or label) and a <strong>fill type</strong> (what fake data to use, or Skip). Rules are checked in order; the first match is used.</p>
-          <p style="margin-top:8px"><strong>Fixed</strong> = match fields that contain your text (e.g. <code>nickname</code>). <strong>Regex</strong> = use a regular expression (e.g. <code>my_.*field</code>). Check the Regex box when your pattern is regex.</p>
-        </div>
+    <section id="panel-rules" class="panel">
+      <div class="section">
+        <h2>Custom rules</h2>
+        <p class="hint" style="margin-top:0;margin-bottom:10px">Match field name/label → fill type. First match wins.</p>
         <div id="rulesList" class="rule-list"></div>
-        <div class="add-rule-form" style="margin-top:16px">
-          <input type="text" id="rulePattern" placeholder="Pattern: e.g. nickname (fixed) or my_.*field (regex)" maxlength="200" aria-label="Pattern to match field" title="Enter text or regex. Match is against field name, placeholder, label." />
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);white-space:nowrap"><input type="checkbox" id="ruleRegex" aria-label="Use regex" title="Check if pattern is a regular expression" /> Regex</label>
-          <select id="ruleType" aria-label="Fill type" title="What kind of fake data to fill, or Skip">
+        <div class="add-rule">
+          <input type="text" id="rulePattern" placeholder="Pattern e.g. nickname" maxlength="200" />
+          <label><input type="checkbox" id="ruleRegex" /> Regex</label>
+          <select id="ruleType">
             <option value="name">Name</option>
             <option value="email">Email</option>
             <option value="phone">Phone</option>
@@ -447,22 +327,22 @@
             <option value="url">URL</option>
             <option value="textarea">Textarea</option>
             <option value="nid">NID</option>
-            <option value="skip">Skip (don’t fill)</option>
+            <option value="skip">Skip</option>
           </select>
-          <button type="button" id="addRule" class="btn btn-primary">Add rule</button>
+          <button type="button" id="addRule" class="btn btn-primary">Add</button>
         </div>
       </div>
     </section>
 
-    <div class="footer-actions">
-      <button type="button" id="resetBtn" class="btn btn-ghost">Reset all to defaults</button>
+    <div class="footer">
+      <button type="button" id="resetBtn" class="btn btn-ghost">Reset defaults</button>
     </div>
   </div>
 
-  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal">
-      <h3 id="modalTitle">Reset settings?</h3>
-      <p>All field toggles will be turned on, custom rules will be removed, and the keyboard shortcut will be enabled. This can’t be undone.</p>
+      <h3>Reset settings?</h3>
+      <p>All toggles on, rules cleared, shortcut enabled.</p>
       <div class="modal-actions">
         <button type="button" id="modalCancel" class="btn btn-ghost">Cancel</button>
         <button type="button" id="modalConfirm" class="btn btn-primary">Reset</button>
@@ -470,11 +350,7 @@
     </div>
   </div>
 
-  <div id="toast" class="toast" aria-live="polite" role="status">
-    <span class="check" aria-hidden="true">✓</span>
-    <span id="toastMessage">Saved</span>
-  </div>
-
+  <div id="toast" class="toast" aria-live="polite"><span id="toastMessage">Saved</span></div>
   <script src="options.js"></script>
 </body>
 </html>
